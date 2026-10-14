@@ -1,0 +1,4 @@
+.claude/settings.local.json
+omniroute/.env
+omniroute/.env.client
+omniroute/data/

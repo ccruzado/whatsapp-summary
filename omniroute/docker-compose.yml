@@ -1,0 +1,40 @@
+# OmniRoute (gateway local de IA) - basado en docker-compose.selfhost.yml del repo oficial
+# Uso:  copy .env.example .env  ->  editar .env  ->  docker compose up -d
+services:
+  omniroute:
+    image: diegosouzapw/omniroute:latest
+    container_name: omniroute
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /app/data
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "${APP_BIND_HOST:-127.0.0.1}:20128:20128"   # dashboard
+      - "${APP_BIND_HOST:-127.0.0.1}:20129:20129"   # API
+      - "${APP_BIND_HOST:-127.0.0.1}:20132:20132"   # websocket
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  redis:
+    image: docker.io/library/redis:8.6.5-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis-data:
