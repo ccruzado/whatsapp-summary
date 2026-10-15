@@ -13,13 +13,9 @@
   <button class="primary" {% if status.running %}disabled{% endif %}>Generar resúmenes{% if pending %} ({{ pending }} pendientes){% endif %}</button>
 </form>
 
-<div class="card incl">
-  <strong>📋 Pendientes y acciones del día</strong>
-  {% if digest %}<div class="summary">{{ digest|md }}</div>
-  {% else %}<p class="muted">Aún no hay resumen del día. Se genera solo a las 20:00, o usa «Generar resúmenes».</p>{% endif %}
-</div>
+{% include "_board.html" %}
 
-<h2>Chats con contenido laboral ({{ chats|length }})</h2>
+<h2 style="margin-top:28px">Detalle por chat — contenido laboral ({{ chats|length }})</h2>
 {% for c in chats %}
 <div class="card incl" data-name="{{ c.label }}" data-state="in">
   <div class="row">

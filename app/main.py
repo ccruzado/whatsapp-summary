@@ -15,8 +15,8 @@ from markupsafe import Markup
 import avatars
 import contacts
 import db
+import items
 import service
-import summarizer
 
 templates = Jinja2Templates(directory="templates")
 templates.env.filters["md"] = lambda t: Markup(markdown.markdown(html.escape(t or ""), extensions=["nl2br"]))
@@ -73,7 +73,7 @@ def day_view(request: Request, d: str):
         item = {"jid": jid, **c, "summary": summaries.get(jid)}
         if jid in skip:
             excluded.append(item)
-        elif item["summary"] and summarizer.is_empty(item["summary"]):
+        elif item["summary"] and service.is_empty(item["summary"]):
             nowork.append(item)
         else:
             work.append(item)
@@ -86,7 +86,8 @@ def day_view(request: Request, d: str):
             "d": d,
             "prev": (day - timedelta(days=1)).isoformat(),
             "next": (day + timedelta(days=1)).isoformat(),
-            "digest": _text("day", d),
+            "board": items.board(day, day, day, {c["jid"]: c for c in db.list_chats()}, skip),
+            "back": f"/day/{d}",
             "chats": work,
             "nowork": nowork,
             "excluded": excluded,
@@ -108,6 +109,13 @@ def day_chat_generate(d: str, jid: str = Form(...)):
     return RedirectResponse(f"/day/{d}", status_code=303)
 
 
+@app.post("/items/{item_id}/estado")
+def item_state(item_id: int, estado: str = Form(...), back: str = Form("/")):
+    if estado in ("abierto", "resuelto", "descartado"):
+        items.set_state(item_id, estado, service.today().isoformat())
+    return RedirectResponse(back if back.startswith("/") else "/", status_code=303)
+
+
 @app.get("/week")
 def week_current():
     return RedirectResponse(f"/week/{service.today().isoformat()}")
@@ -117,14 +125,9 @@ def week_current():
 def week_view(request: Request, d: str):
     monday = service.week_start(_parse(d))
     period = monday.isoformat()
-    skip = db.excluded()
+    sunday = monday + timedelta(days=6)
     labels = {c["jid"]: c for c in db.list_chats()}
-    detail = [
-        {"jid": jid, "label": labels.get(jid, {}).get("label") or db.chat_label(jid), "text": text}
-        for jid, text in db.chat_summaries("weekchat", period).items()
-        if jid and jid not in skip and not text.strip().lower().startswith("sin acciones")
-    ]
-    detail.sort(key=lambda c: db.sort_key(c["label"]))
+    board = items.board(sunday, monday, sunday, labels, db.excluded())
     return templates.TemplateResponse(
         request,
         "week.html",
@@ -134,7 +137,9 @@ def week_view(request: Request, d: str):
             "next": (monday + timedelta(days=7)).isoformat(),
             "days": [(monday + timedelta(days=i)).isoformat() for i in range(7)],
             "digest": _text("week", period),
-            "detail": detail,
+            "board": board,
+            "back": f"/week/{d}",
+            "created": items.created_between(monday, sunday),
             "status": service.STATUS,
         },
     )

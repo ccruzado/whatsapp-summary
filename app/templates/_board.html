@@ -1,0 +1,48 @@
+{# Tablero de pendientes: separa con claridad lo mío de lo que esperan/deben otros. Variables: board, back, avatar. #}
+{% macro rows(list, kind) %}
+{% for r in list %}
+<div class="task {{ kind }}">
+  <img class="av sm" loading="lazy" src="{{ avatar(r.chat_jid, r.label) }}" alt="">
+  <div class="task-body">
+    <div><b>{{ r.label }}</b>{% if r.company %} <span class="muted">· {{ r.company }}</span>{% endif %}</div>
+    <div>{% if r.responsable != 'yo' and r.persona %}<b>{{ r.persona }}:</b> {% endif %}{{ r.accion }}</div>
+    <div class="muted">
+      {% if r.plazo %}⏰ {{ r.plazo }} · {% endif %}
+      {% if kind.startswith('done') %}✓ {{ r.resuelto_dia }}{% if r.evidencia %} {{ r.evidencia }}{% endif %}
+      {% else %}{% if r.age > 0 %}<span class="{{ 'late' if r.age >= 3 }}">desde {{ r.creado_dia }} ({{ r.age }} d)</span>{% else %}nuevo{% endif %}{% endif %}
+      {% if r.contexto %} · {{ r.contexto }}{% endif %}
+    </div>
+  </div>
+  <form method="post" action="/items/{{ r.id }}/estado" class="task-actions">
+    <input type="hidden" name="back" value="{{ back }}">
+    {% if kind.startswith('done') %}
+      <button name="estado" value="abierto" title="Volver a abrir">↩ Reabrir</button>
+    {% else %}
+      <button class="ok" name="estado" value="resuelto" title="Marcar como hecho">✓ Hecho</button>
+      <button name="estado" value="descartado" title="No era un pendiente real / ya no aplica">✕</button>
+    {% endif %}
+  </form>
+</div>
+{% endfor %}
+{% endmacro %}
+
+<div class="board">
+  <section class="col mine">
+    <h2>🙋 Mis pendientes <span class="count">{{ board.mine|length }}</span></h2>
+    {{ rows(board.mine, 'mine') }}
+    {% if not board.mine %}<p class="muted">Nada pendiente de tu lado.</p>{% endif %}
+  </section>
+  <section class="col others">
+    <h2>⏳ Pendientes de otros <span class="count">{{ board.others|length }}</span></h2>
+    {{ rows(board.others, 'others') }}
+    {% if not board.others %}<p class="muted">No estás esperando nada de nadie.</p>{% endif %}
+  </section>
+</div>
+
+{% if board.done_mine or board.done_others %}
+<details class="card" {% if open_done %}open{% endif %}>
+  <summary><b>✅ Resueltos ({{ board.done_mine|length + board.done_others|length }})</b></summary>
+  {% if board.done_mine %}<h3 class="muted">Míos</h3>{{ rows(board.done_mine, 'done mine') }}{% endif %}
+  {% if board.done_others %}<h3 class="muted">De otros</h3>{{ rows(board.done_others, 'done others') }}{% endif %}
+</details>
+{% endif %}

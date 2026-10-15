@@ -39,6 +39,22 @@ def init() -> None:
             """
             CREATE TABLE IF NOT EXISTS excluded_chats (jid TEXT PRIMARY KEY);
             CREATE TABLE IF NOT EXISTS companies (key TEXT PRIMARY KEY, company TEXT NOT NULL);  -- key = últimos 9 dígitos
+            CREATE TABLE IF NOT EXISTS items (   -- pendientes/acciones con ciclo de vida
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_jid TEXT NOT NULL,
+                accion TEXT NOT NULL,
+                responsable TEXT NOT NULL,       -- 'yo' | 'otro'
+                persona TEXT NOT NULL DEFAULT '',
+                plazo TEXT NOT NULL DEFAULT '',
+                contexto TEXT NOT NULL DEFAULT '',
+                estado TEXT NOT NULL DEFAULT 'abierto',   -- abierto | resuelto | descartado
+                creado_dia TEXT NOT NULL,
+                hora_origen TEXT NOT NULL DEFAULT '',
+                resuelto_dia TEXT,
+                evidencia TEXT NOT NULL DEFAULT '',       -- hora del mensaje que lo cerró
+                cerrado_por TEXT NOT NULL DEFAULT ''      -- 'llm' | 'manual'
+            );
+            CREATE INDEX IF NOT EXISTS items_chat ON items (chat_jid, estado);
             CREATE TABLE IF NOT EXISTS summaries (
                 kind TEXT NOT NULL,           -- 'day' | 'week'
                 period TEXT NOT NULL,         -- YYYY-MM-DD (día, o lunes de la semana)
@@ -236,7 +252,10 @@ def _utc(day: date) -> str:
 
 
 def _shape(r: sqlite3.Row, d: _Directory) -> dict | None:
-    text = (r["content"] or "").strip() or (f"[{r['media_type']}]" if r["media_type"] else "")
+    text = (r["content"] or "").strip()
+    if r["media_type"]:  # archivo/imagen enviado: cuenta como evidencia de entrega
+        name = f": {r['filename']}" if r["filename"] else ""
+        text = f"{text} [{r['media_type']}{name}]".strip()
     if not text:
         return None
     ts = datetime.strptime(r["timestamp"][:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).astimezone(TZ)
@@ -253,7 +272,7 @@ def _shape(r: sqlite3.Row, d: _Directory) -> dict | None:
     }
 
 
-_SELECT = """SELECT m.chat_jid, c.name AS chat_name, m.sender, m.content, m.timestamp, m.is_from_me, m.media_type
+_SELECT = """SELECT m.chat_jid, c.name AS chat_name, m.sender, m.content, m.timestamp, m.is_from_me, m.media_type, m.filename
              FROM messages m LEFT JOIN chats c ON c.jid = m.chat_jid"""
 
 
