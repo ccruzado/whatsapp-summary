@@ -7,19 +7,24 @@
   <a href="/week/{{ next }}">siguiente →</a>
 </div>
 
-<div class="card">
-  <div class="row">
-    <strong>Resumen semanal</strong>
-    <form method="post" action="/week/{{ monday }}/generate">
-      <button class="primary" {% if status.running %}disabled{% endif %}>Generar resumen semanal</button>
-    </form>
-  </div>
-  {% if digest %}<p class="summary">{{ digest }}</p>
-  {% else %}<p class="muted">Aún no hay resumen. Se genera los lunes a las 06:00 con la semana anterior, o usa el botón (necesita los resúmenes diarios).</p>{% endif %}
-</div>
+<form method="post" action="/week/{{ monday }}/generate" class="toolbar">
+  <input id="filter" type="search" placeholder="Filtrar chats por nombre…" autocomplete="off">
+  <label class="muted"><input type="checkbox" name="force" value="1"> regenerar todo</label>
+  <button class="primary" {% if status.running %}disabled{% endif %}>Generar resúmenes semanales</button>
+</form>
+<p class="muted">Un resumen por chat, armado con sus resúmenes diarios. Se genera solo los domingos a las 20:00.
+  Días: {% for x in days %}<a href="/day/{{ x }}">{{ x[8:] }}</a>{{ ' · ' if not loop.last }}{% endfor %}</p>
 
-<h2>Días</h2>
-<ul class="plain">
-  {% for x in days %}<li><a href="/day/{{ x }}">{{ x }}</a></li>{% endfor %}
-</ul>
+<h2>Chats de la semana ({{ chats|length }})</h2>
+{% for c in chats %}
+<div class="card incl" data-name="{{ c.label }}" data-state="in">
+  <div class="who">
+    <img class="av" loading="lazy" src="{{ avatar(c.jid, c.label) }}" alt="">
+    <div class="name">{{ '👥 ' if c.group }}{{ c.label }}</div>
+  </div>
+  <div class="summary">{{ c.summary|md }}</div>
+</div>
+{% else %}
+<p class="muted">Aún no hay resúmenes semanales. Necesitan los resúmenes diarios de esos días.</p>
+{% endfor %}
 {% endblock %}

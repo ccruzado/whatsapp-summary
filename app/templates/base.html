@@ -6,40 +6,82 @@
 {% if status.running %}<meta http-equiv="refresh" content="5">{% endif %}
 <title>{% block title %}Resumen de WhatsApp{% endblock %}</title>
 <style>
-  :root { --bg:#fafaf9; --fg:#1c1917; --muted:#78716c; --card:#fff; --line:#e7e5e4; --accent:#15803d; }
+  :root { --bg:#fafaf9; --fg:#1c1917; --muted:#78716c; --card:#fff; --line:#e7e5e4; --accent:#15803d; --accent-bg:#dcfce7;
+          --bad:#b91c1c; --bad-bg:#fee2e2; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#1c1917; --fg:#f5f5f4; --muted:#a8a29e; --card:#292524; --line:#44403c; --accent:#4ade80; }
+    :root { --bg:#1c1917; --fg:#f5f5f4; --muted:#a8a29e; --card:#292524; --line:#44403c; --accent:#4ade80; --accent-bg:#14532d;
+            --bad:#fca5a5; --bad-bg:#450a0a; }
   }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, sans-serif; }
-  main { max-width: 860px; margin: 0 auto; padding: 16px; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; }
   nav { display:flex; gap:16px; align-items:center; flex-wrap:wrap; padding:12px 16px; border-bottom:1px solid var(--line); }
   nav a { color:var(--fg); text-decoration:none; font-weight:600; }
   nav a:hover { color:var(--accent); }
+  a { color:var(--accent); }
   h1 { font-size:1.4rem; margin:8px 0; }
+  h2 { font-size:1.1rem; margin:20px 0 4px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin:12px 0; }
-  .summary { white-space:pre-wrap; }
+  .summary p { margin:.3em 0; } .summary ul { margin:.3em 0; padding-left:1.3em; }
   .muted { color:var(--muted); font-size:.9rem; }
-  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:space-between; }
-  button { font:inherit; padding:6px 12px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:space-between; }
+  .who { display:flex; gap:10px; align-items:center; min-width:0; }
+  .av { width:44px; height:44px; border-radius:50%; object-fit:cover; flex:none; background:var(--line); }
+  .av.sm { width:32px; height:32px; }
+  button, .btn { font:inherit; padding:6px 12px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; text-decoration:none; }
   button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  @media (prefers-color-scheme: dark) { button.primary { color:#052e16; } }
+  button.danger { color:var(--bad); border-color:var(--bad); }
+  button.ok { color:var(--accent); border-color:var(--accent); font-weight:600; }
+  input[type=text], input[type=search], input[type=date], select { font:inherit; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); }
   details summary { cursor:pointer; color:var(--muted); }
   .msg { font-size:.9rem; margin:2px 0; }
-  .msg b { font-weight:600; }
   .status { border-left:4px solid var(--accent); }
-  ul.plain { list-style:none; padding:0; }
-  ul.plain li { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); gap:8px; }
+  .badge { font-size:.75rem; padding:2px 8px; border-radius:99px; font-weight:600; white-space:nowrap; }
+  .badge.in { background:var(--accent-bg); color:var(--accent); }
+  .badge.out { background:var(--bad-bg); color:var(--bad); }
+  .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:12px 0; }
+  .toolbar input[type=search] { flex:1; min-width:180px; }
+  /* chat excluido: apagado, tachado y con borde rojo */
+  .excl { opacity:.6; border-left:4px solid var(--bad); background:repeating-linear-gradient(135deg, transparent 0 10px, rgba(127,127,127,.08) 10px 20px); }
+  .excl .name { text-decoration:line-through; }
+  .excl .av { filter:grayscale(1); }
+  .incl { border-left:4px solid var(--accent); }
+  .name { font-weight:600; overflow:hidden; text-overflow:ellipsis; }
+  .hide { display:none !important; }
+  .tabs button.on { background:var(--fg); color:var(--bg); border-color:var(--fg); }
 </style>
 </head>
 <body>
 <nav>
   <a href="/">Hoy</a>
   <a href="/week">Semana</a>
-  <a href="/chats">Chats excluidos</a>
+  <a href="/messages">Buscar mensajes</a>
+  <a href="/chats">Chats</a>
 </nav>
 <main>
   {% if status.message %}<div class="card status muted">{% if status.running %}⏳ {% endif %}{{ status.message }}</div>{% endif %}
   {% block body %}{% endblock %}
 </main>
+<script>
+  // Filtro en el navegador: oculta tarjetas cuyo data-name no contiene el texto (sin acentos ni mayúsculas).
+  const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const box = document.getElementById('filter');
+  let mode = 'all';
+  function applyFilter() {
+    const q = box ? norm(box.value) : '';
+    document.querySelectorAll('[data-name]').forEach(el => {
+      const okName = norm(el.dataset.name).includes(q);
+      const okMode = mode === 'all' || el.dataset.state === mode;
+      el.classList.toggle('hide', !(okName && okMode));
+    });
+  }
+  if (box) box.addEventListener('input', applyFilter);
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+    mode = b.dataset.mode;
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+    applyFilter();
+  }));
+</script>
 </body>
 </html>

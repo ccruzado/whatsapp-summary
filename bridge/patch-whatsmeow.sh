@@ -6,3 +6,6 @@ sed -i \
  -e 's/GetFirstDevice()/GetFirstDevice(context.Background())/' \
  -e 's/\.GetGroupInfo(/.GetGroupInfo(context.Background(), /' \
  -e 's/Contacts\.GetContact(/Contacts.GetContact(context.Background(), /' main.go
+# Arranca el endpoint interno de fotos (avatar.go) junto al servidor REST original.
+sed -i 's/^\(\s*\)startRESTServer(client, messageStore, 8080)/\1startAvatarServer(client)\n\1startRESTServer(client, messageStore, 8080)/' main.go
+grep -q startAvatarServer main.go

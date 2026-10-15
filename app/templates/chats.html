@@ -2,19 +2,34 @@
 {% block title %}Chats{% endblock %}
 {% block body %}
 <h1>Chats y grupos</h1>
-<p class="muted">Los chats excluidos no aparecen ni se resumen. Los mensajes siguen guardándose en el puente.</p>
-<ul class="plain">
-  {% for c in chats %}
-  <li>
-    <span>{{ '👥 ' if c.group else '👤 ' }}{{ c.label }}{% if c.excluded %} <span class="muted">(excluido)</span>{% endif %}</span>
+<p class="muted">Los chats <b>excluidos</b> no aparecen ni se resumen. Los mensajes siguen guardándose en el puente.</p>
+
+<div class="toolbar">
+  <input id="filter" type="search" placeholder="Buscar chat…" autocomplete="off">
+  <span class="tabs">
+    <button class="on" data-mode="all">Todos ({{ chats|length }})</button>
+    <button data-mode="in">✓ Incluidos ({{ chats|length - n_excluded }})</button>
+    <button data-mode="out">🚫 Excluidos ({{ n_excluded }})</button>
+  </span>
+</div>
+
+{% for c in chats %}
+<div class="card {{ 'excl' if c.excluded else 'incl' }}" style="padding:10px 14px;margin:8px 0"
+     data-name="{{ c.label }}" data-state="{{ 'out' if c.excluded else 'in' }}">
+  <div class="row">
+    <div class="who">
+      <img class="av sm" loading="lazy" src="{{ avatar(c.jid, c.label) }}" alt="">
+      <span class="name">{{ '👥 ' if c.group }}{{ c.label }}</span>
+      {% if c.excluded %}<span class="badge out">🚫 Excluido</span>{% else %}<span class="badge in">✓ Incluido</span>{% endif %}
+    </div>
     <form method="post" action="/chats/toggle">
       <input type="hidden" name="jid" value="{{ c.jid }}">
-      {% if not c.excluded %}<input type="hidden" name="excluded" value="1">{% endif %}
-      <button>{{ 'Incluir' if c.excluded else 'Excluir' }}</button>
+      {% if c.excluded %}<button class="ok">Incluir de nuevo</button>
+      {% else %}<input type="hidden" name="excluded" value="1"><button class="danger">Excluir</button>{% endif %}
     </form>
-  </li>
-  {% else %}
-  <li class="muted">Aún no hay chats. Vincula WhatsApp escaneando el QR (ver README).</li>
-  {% endfor %}
-</ul>
+  </div>
+</div>
+{% else %}
+<p class="muted">Aún no hay chats. Vincula WhatsApp escaneando el QR (ver README).</p>
+{% endfor %}
 {% endblock %}

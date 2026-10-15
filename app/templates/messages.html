@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Buscar mensajes{% endblock %}
+{% block body %}
+<h1>Buscar mensajes</h1>
+<form method="get" action="/messages" class="card">
+  <div class="toolbar" style="margin:0">
+    <label>Persona o chat <input type="text" name="person" value="{{ person }}" list="people" placeholder="Nombre…" autocomplete="off"></label>
+    <label>Texto <input type="text" name="text" value="{{ text }}" placeholder="Palabra o frase…"></label>
+  </div>
+  <div class="toolbar">
+    <label>Desde <input type="date" name="desde" value="{{ desde }}"></label>
+    <label>Hasta <input type="date" name="hasta" value="{{ hasta }}"></label>
+    <button class="primary">Buscar</button>
+  </div>
+  <datalist id="people">{% for p in people %}<option value="{{ p }}">{% endfor %}</datalist>
+  <p class="muted" style="margin:0">«Persona o chat» coincide con el nombre del chat o con quien escribió en un grupo.</p>
+</form>
+
+{% if searched %}
+<p class="muted">{{ total }} mensaje(s){{ ' — mostrando los 500 más recientes' if more }}.</p>
+{% for day, msgs in groups.items() %}
+<h2>{{ day }}</h2>
+<div class="card">
+  {% for m in msgs %}
+  <div class="msg"><span class="muted">{{ m.time }}</span>
+    <b>{{ m.who }}</b> <span class="muted">en {{ m.chat }}</span>: {{ m.text }}</div>
+  {% endfor %}
+</div>
+{% endfor %}
+{% else %}
+<p class="muted">Escribe una persona, un chat o un texto para buscar.</p>
+{% endif %}
+{% endblock %}

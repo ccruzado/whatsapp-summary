@@ -6,6 +6,7 @@ WORKDIR /src/whatsapp-bridge
 # El whatsmeow fijado en el repo está desactualizado: WhatsApp rechaza ese cliente (405).
 # Se actualiza y se adapta main.go a los cambios de API.
 COPY patch-whatsmeow.sh /patch-whatsmeow.sh
+COPY avatar.go /src/whatsapp-bridge/avatar.go
 RUN go get go.mau.fi/whatsmeow@latest && go mod tidy && bash /patch-whatsmeow.sh \
     && CGO_ENABLED=1 go build -o /bridge .
 

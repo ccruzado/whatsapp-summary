@@ -1,4 +1,4 @@
-"""Orquestación: genera resúmenes diarios y semanales en segundo plano."""
+"""Orquestación: genera resúmenes por chat (diarios y semanales) en segundo plano."""
 import threading
 from datetime import date, datetime, timedelta
 
@@ -37,47 +37,53 @@ def start(target, *args) -> bool:
     return True
 
 
+def _summarize_day_chat(period: str, jid: str, chat: dict, force: bool) -> None:
+    """Resume un chat del día; se reutiliza el resumen si no cambió el número de mensajes."""
+    n = len(chat["messages"])
+    row = db.get_summary_row("day", period, jid)
+    if not force and row and row["msg_count"] == n:
+        return
+    db.save_summary("day", period, jid, summarizer.summarize_chat(chat["label"], chat["group"], chat["messages"]), n)
+
+
 def generate_day(day: date, force: bool = False) -> None:
     period = day.isoformat()
     skip = db.excluded()
     chats = {jid: c for jid, c in db.day_messages(day).items() if jid not in skip}
-    done = []
-    for i, (jid, chat) in enumerate(chats.items(), 1):
+    for i, (jid, chat) in enumerate(sorted(chats.items(), key=lambda kv: db.sort_key(kv[1]["label"])), 1):
         STATUS["message"] = f"Resumiendo {chat['label']} ({i}/{len(chats)})…"
-        text = None if force else db.get_summary("day", period, jid)
-        if text is None:
-            text = summarizer.summarize_chat(chat["label"], chat["group"], chat["messages"])
-            db.save_summary("day", period, jid, text)
-        done.append((chat["label"], text))
-    if not done:
-        db.save_summary("day", period, "", "Sin conversaciones para resumir este día.")
-        return
-    STATUS["message"] = "Armando resumen del día…"
-    db.save_summary("day", period, "", summarizer.digest_day(period, done))
+        _summarize_day_chat(period, jid, chat, force)
 
 
-def generate_week(monday: date) -> None:
-    days = []
-    for i in range(7):
-        d = (monday + timedelta(days=i)).isoformat()
-        text = db.get_summary("day", d)
-        if text and not text.startswith("Sin conversaciones"):
-            days.append((d, text))
-    end = (monday + timedelta(days=6)).isoformat()
-    if not days:
-        db.save_summary("week", monday.isoformat(), "", "No hay resúmenes diarios en esta semana.")
-        return
-    STATUS["message"] = "Armando resumen semanal…"
-    db.save_summary("week", monday.isoformat(), "", summarizer.digest_week(monday.isoformat(), end, days))
+def generate_day_chat(day: date, jid: str) -> None:
+    chat = db.day_messages(day).get(jid)
+    if chat:
+        STATUS["message"] = f"Resumiendo {chat['label']}…"
+        _summarize_day_chat(day.isoformat(), jid, chat, True)
+
+
+def generate_week(monday: date, force: bool = False) -> None:
+    """Resumen semanal por chat, a partir de sus resúmenes diarios."""
+    period = monday.isoformat()
+    skip = db.excluded()
+    per_chat = {j: v for j, v in db.day_summaries_between(monday, 7).items() if j not in skip}
+    labels = {c["jid"]: c for c in db.list_chats()}
+    for i, (jid, days) in enumerate(sorted(per_chat.items(), key=lambda kv: db.sort_key(labels.get(kv[0], {}).get("label", kv[0]))), 1):
+        info = labels.get(jid, {"label": db.chat_label(jid), "group": jid.endswith("@g.us")})
+        STATUS["message"] = f"Semana: {info['label']} ({i}/{len(per_chat)})…"
+        row = db.get_summary_row("week", period, jid)
+        if not force and row and row["msg_count"] == len(days):
+            continue
+        text = days[0][1] if len(days) == 1 else summarizer.summarize_chat_week(info["label"], info["group"], days)
+        db.save_summary("week", period, jid, text, len(days))
 
 
 def scheduled_job() -> None:
-    """Hora programada: resume el día anterior; los lunes, además, la semana anterior."""
-    yesterday = today() - timedelta(days=1)
-
+    """Hora programada: resume el día de hoy; los domingos, además, la semana."""
     def job():
-        generate_day(yesterday)
-        if today().weekday() == 0:
-            generate_week(week_start(yesterday))
+        t = today()
+        generate_day(t)
+        if t.weekday() == 6:
+            generate_week(week_start(t))
 
     start(job)

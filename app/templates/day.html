@@ -7,38 +7,62 @@
   <a href="/day/{{ next }}">{{ next }} →</a>
 </div>
 
-<div class="card">
-  <div class="row">
-    <strong>Resumen del día</strong>
-    <form method="post" action="/day/{{ d }}/generate" class="row">
-      <label class="muted"><input type="checkbox" name="force" value="1"> regenerar todo</label>
-      <button class="primary" {% if status.running %}disabled{% endif %}>Generar resumen</button>
-    </form>
-  </div>
-  {% if digest %}<p class="summary">{{ digest }}</p>
-  {% else %}<p class="muted">Aún no hay resumen. Se genera solo a las 06:00 con el día anterior, o usa el botón.</p>{% endif %}
-</div>
+<form method="post" action="/day/{{ d }}/generate" class="toolbar">
+  <input id="filter" type="search" placeholder="Filtrar chats por nombre…" autocomplete="off">
+  <label class="muted"><input type="checkbox" name="force" value="1"> regenerar todo</label>
+  <button class="primary" {% if status.running %}disabled{% endif %}>Generar resúmenes{% if pending %} ({{ pending }} pendientes){% endif %}</button>
+</form>
+<p class="muted">Un resumen por chat. Se generan solos todos los días a las 20:00; si llegan mensajes nuevos después, se actualizan en la siguiente corrida.</p>
 
-<h2>Interacciones ({{ chats|length }} chats)</h2>
+<h2>Chats del día ({{ chats|length }})</h2>
 {% for c in chats %}
-<div class="card">
+<div class="card incl" data-name="{{ c.label }}" data-state="in">
   <div class="row">
-    <strong>{{ '👥 ' if c.group else '👤 ' }}{{ c.label }}</strong>
-    <span class="muted">{{ c.messages|length }} mensajes</span>
+    <div class="who">
+      <img class="av" loading="lazy" src="{{ avatar(c.jid, c.label) }}" alt="">
+      <div style="min-width:0"><div class="name">{{ '👥 ' if c.group }}{{ c.label }}</div>
+        <div class="muted">{{ c.messages|length }} mensajes</div></div>
+    </div>
+    <div class="row">
+      <form method="post" action="/day/{{ d }}/chat">
+        <input type="hidden" name="jid" value="{{ c.jid }}">
+        <button {% if status.running %}disabled{% endif %}>{{ 'Regenerar' if c.summary else 'Resumir' }}</button>
+      </form>
+      <form method="post" action="/chats/toggle">
+        <input type="hidden" name="jid" value="{{ c.jid }}"><input type="hidden" name="excluded" value="1">
+        <input type="hidden" name="back" value="/day/{{ d }}">
+        <button class="danger">Excluir</button>
+      </form>
+    </div>
   </div>
-  {% if c.summary %}<p class="summary">{{ c.summary }}</p>{% endif %}
+  {% if c.summary %}<div class="summary">{{ c.summary|md }}</div>
+  {% else %}<p class="muted">Sin resumen todavía.</p>{% endif %}
   <details>
     <summary>Ver mensajes</summary>
     {% for m in c.messages %}<div class="msg"><span class="muted">{{ m.time }}</span> <b>{{ m.who }}</b>: {{ m.text }}</div>{% endfor %}
   </details>
-  <form method="post" action="/chats/toggle" style="margin-top:8px">
-    <input type="hidden" name="jid" value="{{ c.jid }}">
-    <input type="hidden" name="excluded" value="1">
-    <button class="muted">Excluir este chat</button>
-  </form>
 </div>
 {% else %}
-<p class="muted">No hay mensajes este día (o aún no vinculas WhatsApp).</p>
+<p class="muted">No hay mensajes este día.</p>
 {% endfor %}
-{% if excluded_count %}<p class="muted">{{ excluded_count }} chat(s) con actividad están excluidos. <a href="/chats">Gestionar</a></p>{% endif %}
+
+{% if excluded %}
+<h2>🚫 Excluidos con actividad ({{ excluded|length }})</h2>
+<p class="muted">No se resumen ni se cuentan arriba.</p>
+{% for c in excluded %}
+<div class="card excl" data-name="{{ c.label }}" data-state="out">
+  <div class="row">
+    <div class="who">
+      <img class="av sm" loading="lazy" src="{{ avatar(c.jid, c.label) }}" alt="">
+      <span class="name">{{ c.label }}</span> <span class="badge out">Excluido</span>
+    </div>
+    <form method="post" action="/chats/toggle">
+      <input type="hidden" name="jid" value="{{ c.jid }}">
+      <input type="hidden" name="back" value="/day/{{ d }}">
+      <button class="ok">Incluir de nuevo</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
 {% endblock %}
