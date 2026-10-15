@@ -12,16 +12,21 @@
   <label class="muted"><input type="checkbox" name="force" value="1"> regenerar todo</label>
   <button class="primary" {% if status.running %}disabled{% endif %}>Generar resúmenes{% if pending %} ({{ pending }} pendientes){% endif %}</button>
 </form>
-<p class="muted">Un resumen por chat. Se generan solos todos los días a las 20:00; si llegan mensajes nuevos después, se actualizan en la siguiente corrida.</p>
 
-<h2>Chats del día ({{ chats|length }})</h2>
+<div class="card incl">
+  <strong>📋 Pendientes y acciones del día</strong>
+  {% if digest %}<div class="summary">{{ digest|md }}</div>
+  {% else %}<p class="muted">Aún no hay resumen del día. Se genera solo a las 20:00, o usa «Generar resúmenes».</p>{% endif %}
+</div>
+
+<h2>Chats con contenido laboral ({{ chats|length }})</h2>
 {% for c in chats %}
 <div class="card incl" data-name="{{ c.label }}" data-state="in">
   <div class="row">
     <div class="who">
       <img class="av" loading="lazy" src="{{ avatar(c.jid, c.label) }}" alt="">
       <div style="min-width:0"><div class="name">{{ '👥 ' if c.group }}{{ c.label }}</div>
-        <div class="muted">{{ c.messages|length }} mensajes</div></div>
+        <div class="muted">{% if c.company %}{{ c.company }} · {% endif %}{{ c.messages|length }} mensajes</div></div>
     </div>
     <div class="row">
       <form method="post" action="/day/{{ d }}/chat">
@@ -43,8 +48,25 @@
   </details>
 </div>
 {% else %}
-<p class="muted">No hay mensajes este día.</p>
+<p class="muted">No hay chats con contenido laboral este día.</p>
 {% endfor %}
+
+{% if nowork %}
+<details style="margin-top:16px">
+  <summary>Sin contenido laboral ({{ nowork|length }})</summary>
+  {% for c in nowork %}
+  <div class="card" style="padding:8px 14px;margin:6px 0" data-name="{{ c.label }}" data-state="in">
+    <div class="row">
+      <div class="who"><img class="av sm" loading="lazy" src="{{ avatar(c.jid, c.label) }}" alt=""><span class="name">{{ c.label }}</span>
+        <span class="muted">{{ c.messages|length }} mensajes</span></div>
+      <details><summary>Ver mensajes</summary>
+        {% for m in c.messages %}<div class="msg"><span class="muted">{{ m.time }}</span> <b>{{ m.who }}</b>: {{ m.text }}</div>{% endfor %}
+      </details>
+    </div>
+  </div>
+  {% endfor %}
+</details>
+{% endif %}
 
 {% if excluded %}
 <h2>🚫 Excluidos con actividad ({{ excluded|length }})</h2>

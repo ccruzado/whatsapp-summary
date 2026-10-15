@@ -1,4 +1,4 @@
-"""Web local: resumen por chat, interacciones diarias, búsqueda de mensajes y exclusión de chats."""
+"""Web local: pendientes del día, resumen por chat, resumen semanal, búsqueda de mensajes y exclusión de chats."""
 import html
 import os
 from contextlib import asynccontextmanager
@@ -7,14 +7,16 @@ from urllib.parse import quote
 
 import markdown
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 
 import avatars
+import contacts
 import db
 import service
+import summarizer
 
 templates = Jinja2Templates(directory="templates")
 templates.env.filters["md"] = lambda t: Markup(markdown.markdown(html.escape(t or ""), extensions=["nl2br"]))
@@ -36,6 +38,11 @@ app = FastAPI(lifespan=lifespan)
 
 def _parse(d: str) -> date:
     return date.fromisoformat(d)
+
+
+def _text(kind: str, period: str) -> str | None:
+    row = db.get_summary_row(kind, period, "")
+    return row["text"] if row else None
 
 
 @app.get("/health")
@@ -61,12 +68,17 @@ def day_view(request: Request, d: str):
     day = _parse(d)
     skip = db.excluded()
     summaries = db.chat_summaries("day", d)
-    chats, excluded = [], []
+    work, nowork, excluded = [], [], []
     for jid, c in db.day_messages(day).items():
         item = {"jid": jid, **c, "summary": summaries.get(jid)}
-        (excluded if jid in skip else chats).append(item)
-    chats.sort(key=lambda c: db.sort_key(c["label"]))
-    excluded.sort(key=lambda c: db.sort_key(c["label"]))
+        if jid in skip:
+            excluded.append(item)
+        elif item["summary"] and summarizer.is_empty(item["summary"]):
+            nowork.append(item)
+        else:
+            work.append(item)
+    for lst in (work, nowork, excluded):
+        lst.sort(key=lambda c: db.sort_key(c["label"]))
     return templates.TemplateResponse(
         request,
         "day.html",
@@ -74,9 +86,11 @@ def day_view(request: Request, d: str):
             "d": d,
             "prev": (day - timedelta(days=1)).isoformat(),
             "next": (day + timedelta(days=1)).isoformat(),
-            "chats": chats,
+            "digest": _text("day", d),
+            "chats": work,
+            "nowork": nowork,
             "excluded": excluded,
-            "pending": sum(1 for c in chats if not c["summary"]),
+            "pending": sum(1 for c in work if not c["summary"]),
             "status": service.STATUS,
         },
     )
@@ -102,24 +116,25 @@ def week_current():
 @app.get("/week/{d}")
 def week_view(request: Request, d: str):
     monday = service.week_start(_parse(d))
+    period = monday.isoformat()
     skip = db.excluded()
-    summaries = db.chat_summaries("week", monday.isoformat())
     labels = {c["jid"]: c for c in db.list_chats()}
-    chats = [
-        {"jid": jid, "label": labels.get(jid, {}).get("label") or db.chat_label(jid), "group": jid.endswith("@g.us"), "summary": text}
-        for jid, text in summaries.items()
-        if jid not in skip
+    detail = [
+        {"jid": jid, "label": labels.get(jid, {}).get("label") or db.chat_label(jid), "text": text}
+        for jid, text in db.chat_summaries("weekchat", period).items()
+        if jid and jid not in skip and not text.strip().lower().startswith("sin acciones")
     ]
-    chats.sort(key=lambda c: db.sort_key(c["label"]))
+    detail.sort(key=lambda c: db.sort_key(c["label"]))
     return templates.TemplateResponse(
         request,
         "week.html",
         {
-            "monday": monday.isoformat(),
+            "monday": period,
             "prev": (monday - timedelta(days=7)).isoformat(),
             "next": (monday + timedelta(days=7)).isoformat(),
             "days": [(monday + timedelta(days=i)).isoformat() for i in range(7)],
-            "chats": chats,
+            "digest": _text("week", period),
+            "detail": detail,
             "status": service.STATUS,
         },
     )
@@ -173,3 +188,18 @@ def chats_view(request: Request):
 def chats_toggle(jid: str = Form(...), excluded: str = Form(""), back: str = Form("/chats")):
     db.set_excluded(jid, bool(excluded))
     return RedirectResponse(back if back.startswith("/") else "/chats", status_code=303)
+
+
+@app.get("/contactos")
+def contacts_view(request: Request, importados: int = -1):
+    return templates.TemplateResponse(
+        request,
+        "contacts.html",
+        {"total": db.company_count(), "importados": importados, "status": service.STATUS},
+    )
+
+
+@app.post("/contactos/importar")
+async def contacts_import(archivo: UploadFile = File(...)):
+    pairs = contacts.parse(archivo.filename or "", await archivo.read())
+    return RedirectResponse(f"/contactos?importados={db.import_companies(pairs)}", status_code=303)

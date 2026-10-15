@@ -18,14 +18,17 @@ services:
       - "127.0.0.1:8765:8000"
     environment:
       OLLAMA_URL: http://host.docker.internal:11434
-      OLLAMA_MODEL: qwen2.5:7b
+      OLLAMA_MODEL: qwen3:8b
       TZ_NAME: America/Lima
       SUMMARY_HOUR: "20"
+      OWNER_NAME: "Carlos Cruzado"  # cómo te nombran los demás en los chats
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - bridge_store:/bridge:ro
       - app_data:/data
+      # Prompts editables sin reconstruir: edita app/prompts.py y `docker compose restart app`.
+      - ./app/prompts.py:/srv/prompts.py:ro
 
 volumes:
   bridge_store:

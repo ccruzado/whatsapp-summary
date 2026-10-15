@@ -19,7 +19,7 @@
   <div class="row">
     <div class="who">
       <img class="av sm" loading="lazy" src="{{ avatar(c.jid, c.label) }}" alt="">
-      <span class="name">{{ '👥 ' if c.group }}{{ c.label }}</span>
+      <span class="name">{{ '👥 ' if c.group }}{{ c.label }}</span>{% if c.company %} <span class="muted">· {{ c.company }}</span>{% endif %}
       {% if c.excluded %}<span class="badge out">🚫 Excluido</span>{% else %}<span class="badge in">✓ Incluido</span>{% endif %}
     </div>
     <form method="post" action="/chats/toggle">

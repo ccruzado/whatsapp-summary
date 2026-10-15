@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Empresas de contactos{% endblock %}
+{% block body %}
+<h1>Empresa de tus contactos</h1>
+<p class="muted">WhatsApp no entrega el campo «Empresa» de tu agenda (solo el nombre). Para mostrarla junto al nombre, importa tu agenda y se cruza por teléfono. El archivo se procesa en tu PC y solo se guardan teléfono y empresa.</p>
+
+{% if importados >= 0 %}<div class="card status">{{ importados }} contacto(s) con empresa importados.</div>{% endif %}
+<p>Contactos con empresa guardados: <b>{{ total }}</b></p>
+
+<form method="post" action="/contactos/importar" enctype="multipart/form-data" class="card">
+  <p><b>Subir archivo</b> (.csv de Google Contacts o Outlook, o .vcf)</p>
+  <input type="file" name="archivo" accept=".csv,.vcf" required>
+  <button class="primary">Importar</button>
+</form>
+
+<h2>Cómo obtener el archivo</h2>
+<ul>
+  <li><b>Google Contacts</b>: contacts.google.com → Exportar → «Google CSV».</li>
+  <li><b>iPhone / Android</b>: exporta los contactos como vCard (.vcf) desde la app Contactos.</li>
+</ul>
+{% endblock %}

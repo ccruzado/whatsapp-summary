@@ -8,23 +8,28 @@
 </div>
 
 <form method="post" action="/week/{{ monday }}/generate" class="toolbar">
-  <input id="filter" type="search" placeholder="Filtrar chats por nombre…" autocomplete="off">
   <label class="muted"><input type="checkbox" name="force" value="1"> regenerar todo</label>
-  <button class="primary" {% if status.running %}disabled{% endif %}>Generar resúmenes semanales</button>
+  <button class="primary" {% if status.running %}disabled{% endif %}>Generar resumen semanal</button>
 </form>
-<p class="muted">Un resumen por chat, armado con sus resúmenes diarios. Se genera solo los domingos a las 20:00.
+<p class="muted">Resumen general de todos los chats, con el estado de cada pendiente (✅ hecho / ⏳ abierto). Se genera solo los domingos a las 20:00 a partir de los resúmenes diarios.
   Días: {% for x in days %}<a href="/day/{{ x }}">{{ x[8:] }}</a>{{ ' · ' if not loop.last }}{% endfor %}</p>
 
-<h2>Chats de la semana ({{ chats|length }})</h2>
-{% for c in chats %}
-<div class="card incl" data-name="{{ c.label }}" data-state="in">
-  <div class="who">
-    <img class="av" loading="lazy" src="{{ avatar(c.jid, c.label) }}" alt="">
-    <div class="name">{{ '👥 ' if c.group }}{{ c.label }}</div>
-  </div>
-  <div class="summary">{{ c.summary|md }}</div>
+<div class="card incl">
+  <strong>📋 Resumen semanal</strong>
+  {% if digest %}<div class="summary">{{ digest|md }}</div>
+  {% else %}<p class="muted">Aún no hay resumen semanal. Necesita los resúmenes diarios de esos días.</p>{% endif %}
 </div>
-{% else %}
-<p class="muted">Aún no hay resúmenes semanales. Necesitan los resúmenes diarios de esos días.</p>
-{% endfor %}
+
+{% if detail %}
+<details>
+  <summary>Detalle por chat ({{ detail|length }})</summary>
+  <input id="filter" type="search" placeholder="Filtrar chats por nombre…" autocomplete="off" style="width:100%;margin:8px 0">
+  {% for c in detail %}
+  <div class="card" data-name="{{ c.label }}" data-state="in">
+    <div class="who"><img class="av sm" loading="lazy" src="{{ avatar(c.jid, c.label) }}" alt=""><div class="name">{{ c.label }}</div></div>
+    <div class="summary">{{ c.text|md }}</div>
+  </div>
+  {% endfor %}
+</details>
+{% endif %}
 {% endblock %}

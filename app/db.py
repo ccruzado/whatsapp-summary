@@ -38,6 +38,7 @@ def init() -> None:
         c.executescript(
             """
             CREATE TABLE IF NOT EXISTS excluded_chats (jid TEXT PRIMARY KEY);
+            CREATE TABLE IF NOT EXISTS companies (key TEXT PRIMARY KEY, company TEXT NOT NULL);  -- key = últimos 9 dígitos
             CREATE TABLE IF NOT EXISTS summaries (
                 kind TEXT NOT NULL,           -- 'day' | 'week'
                 period TEXT NOT NULL,         -- YYYY-MM-DD (día, o lunes de la semana)
@@ -65,6 +66,39 @@ def set_excluded(jid: str, value: bool) -> None:
             c.execute("INSERT OR IGNORE INTO excluded_chats VALUES (?)", (jid,))
         else:
             c.execute("DELETE FROM excluded_chats WHERE jid = ?", (jid,))
+
+
+def phone_key(digits: str) -> str | None:
+    d = "".join(ch for ch in digits if ch.isdigit())
+    return d[-9:] if len(d) >= 9 else None
+
+
+def import_companies(pairs: list[tuple[str, str]]) -> int:
+    """Guarda (teléfono, empresa) de la agenda importada; devuelve cuántos se guardaron."""
+    rows = {k: c.strip() for p, c in pairs if c.strip() and (k := phone_key(p))}
+    with app_conn() as c:
+        c.executemany("INSERT OR REPLACE INTO companies VALUES (?,?)", rows.items())
+    global _companies
+    _companies = None
+    return len(rows)
+
+
+_companies: dict[str, str] | None = None
+
+
+def company_for(token: str) -> str:
+    """Empresa del contacto (de la agenda importada), o ''."""
+    global _companies
+    if _companies is None:
+        with app_conn() as c:
+            _companies = {r["key"]: r["company"] for r in c.execute("SELECT key, company FROM companies")}
+    key = phone_key(directory().pn(token))
+    return _companies.get(key, "") if key else ""
+
+
+def company_count() -> int:
+    with app_conn() as c:
+        return c.execute("SELECT COUNT(*) FROM companies").fetchone()[0]
 
 
 def get_summary_row(kind: str, period: str, chat_jid: str) -> sqlite3.Row | None:
@@ -192,7 +226,7 @@ def list_chats() -> list[dict]:
         cur = chats.get(jid)
         label = chat_label(jid, r["name"])
         if cur is None or (cur["label"].startswith("+") and not label.startswith("+")):
-            chats[jid] = {"jid": jid, "label": label, "group": jid.endswith("@g.us")}
+            chats[jid] = {"jid": jid, "label": label, "group": jid.endswith("@g.us"), "company": company_for(jid)}
     return sorted(chats.values(), key=lambda c: sort_key(c["label"]))
 
 
@@ -238,7 +272,9 @@ def day_messages(day: date) -> dict[str, dict]:
     for r in rows:
         m = _shape(r, d)
         if m:
-            chat = out.setdefault(m["jid"], {"label": m["chat"], "group": m["group"], "messages": []})
+            chat = out.setdefault(
+                m["jid"], {"label": m["chat"], "group": m["group"], "company": company_for(m["jid"]), "messages": []}
+            )
             chat["messages"].append(m)
     for chat in out.values():
         chat["messages"].sort(key=lambda m: m["ts"])
