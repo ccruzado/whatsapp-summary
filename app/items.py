@@ -37,7 +37,7 @@ def for_chat_day(jid: str, day: str) -> list[dict]:
     """Pendientes del chat relevantes ese día: creados, resueltos ese día o aún abiertos (arrastrados)."""
     return _rows(
         """SELECT * FROM items WHERE chat_jid=? AND estado != 'descartado' AND creado_dia <= ?
-           AND (estado='abierto' OR resuelto_dia >= ?) ORDER BY id""",
+           AND (estado='abierto' OR resuelto_dia = ?) ORDER BY id""",
         (jid, day, day),
     )
 
@@ -142,13 +142,11 @@ _URGENT = re.compile(r"\b(hoy|ma[nñ]ana|urgente|antes del|hasta el|lunes|martes
 
 
 def board(as_of: date, res_from: date, res_to: date, labels: dict[str, dict], skip: set[str]) -> dict[str, list[dict]]:
-    """Tablero: abiertos al final de `as_of` (míos / de otros) y resueltos entre `res_from` y `res_to`."""
+    """Tablero: abiertos hoy y creados hasta `as_of` (míos / de otros), y resueltos entre `res_from` y `res_to`."""
     d = as_of.isoformat()
-    open_rows = _rows(
-        """SELECT * FROM items WHERE estado != 'descartado' AND creado_dia <= ?
-           AND (estado='abierto' OR resuelto_dia > ?)""",
-        (d, d),
-    )
+    # Estado actual: lo que ya cerraste o descartaste no aparece como abierto en días anteriores;
+    # solo se ve en «Resueltos» del día en que se cerró.
+    open_rows = _rows("SELECT * FROM items WHERE estado='abierto' AND creado_dia <= ?", (d,))
     done_rows = _rows(
         "SELECT * FROM items WHERE estado='resuelto' AND resuelto_dia >= ? AND resuelto_dia <= ?",
         (res_from.isoformat(), res_to.isoformat()),
