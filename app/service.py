@@ -137,21 +137,46 @@ def _render_chat(jid: str, day: str, tema: str, datos: list[str], changed: bool)
             extra.append(f"desde {r['creado_dia']}")
         if r["estado"] == "resuelto" and r["evidencia"]:
             extra.append(f"✓ {r['evidencia']}")
+        proyecto = f" [{r['cliente']}]" if r.get("cliente") else ""
         ctx = f" _({r['contexto']})_" if r["contexto"] else ""
-        return f"- {who}{r['accion']}" + (f" — {', '.join(extra)}" if extra else "") + ctx
+        nota = f" 📝 {r['nota']}" if r.get("nota") else ""
+        return f"- {who}{r['accion']}{proyecto}" + (f" — {', '.join(extra)}" if extra else "") + ctx + nota
 
     mine = [r for r in rows if r["estado"] == "abierto" and r["responsable"] == "yo"]
     others = [r for r in rows if r["estado"] == "abierto" and r["responsable"] != "yo"]
     done = [r for r in rows if r["estado"] == "resuelto" and r["resuelto_dia"] == day]
+    dropped = items.discarded_on(jid, day)
     out = []
     if tema:
         out.append(f"**Tema:** {tema}")
-    for title, lst in (("Mis pendientes", mine), ("Pendientes de otros", others), ("Resuelto hoy", done)):
+    for title, lst in (
+        ("Mis pendientes", mine),
+        ("Pendientes de otros", others),
+        ("Resuelto hoy", done),
+        ("No aplica (descartado)", dropped),
+    ):
         if lst:
             out += [f"**{title}:**", *[line(r) for r in lst]]
     if datos:
         out.append("**Datos clave:** " + "; ".join(datos[:5]))
-    return "\n".join(out) if (rows or datos) else prompts.NO_WORK
+    return "\n".join(out) if (rows or datos or dropped) else prompts.NO_WORK
+
+
+def refresh_chat(jid: str) -> None:
+    """Re-arma (sin LLM, al instante) los resúmenes del chat con el estado actual de sus pendientes.
+
+    Se llama cada vez que cambias una tarea (hecha, descartada, reabierta) o su contexto, para que el resumen
+    refleje lo hecho, lo descartado y el contexto añadido.
+    """
+    with db.app_conn() as c:
+        rows = c.execute("SELECT period, text, msg_count FROM summaries WHERE kind='day' AND chat_jid=?", (jid,)).fetchall()
+    for r in rows:
+        if is_empty(r["text"]):  # un día sin contenido laboral no se «revive» por pendientes arrastrados
+            continue
+        tema = summarizer.topic_of(r["text"])
+        m = re.search(r"\*\*Datos clave:\*\*\s*(.+)", r["text"])
+        datos = [d.strip() for d in m.group(1).split(";") if d.strip()] if m else []
+        db.save_summary("day", r["period"], jid, _render_chat(jid, r["period"], tema, datos, True), r["msg_count"])
 
 
 def _summarize_day_chat(period: str, jid: str, chat: dict, force: bool) -> None:
@@ -166,7 +191,7 @@ def _summarize_day_chat(period: str, jid: str, chat: dict, force: bool) -> None:
     tema, datos, changed = "", [], False
     known: list[dict] = []
     for block in summarizer.group_lines(lines):
-        known = [k for k in known if k["estado"] == "resuelto"] + items.open_for_chat(jid)
+        known = [k for k in known if k["estado"] == "resuelto"] + items.open_for_chat(jid) + items.closed_by_user(jid)
         res = summarizer.extract(chat["label"], chat["group"], chat.get("company", ""), period, block, known)
         tema = tema or " ".join(str(res.get("tema") or "").split())
         datos += [d for d in (res.get("datos_clave") or []) if isinstance(d, str) and d.strip() and d not in datos]

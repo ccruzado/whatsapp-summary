@@ -109,10 +109,18 @@ def day_chat_generate(d: str, jid: str = Form(...)):
     return RedirectResponse(f"/day/{d}", status_code=303)
 
 
+def _refresh(item_id: int) -> None:
+    """Tras cambiar una tarea, el resumen de su chat se re-arma con el estado y contexto actuales."""
+    item = items.get(item_id)
+    if item:
+        service.refresh_chat(item["chat_jid"])
+
+
 @app.post("/items/{item_id}/estado")
 def item_state(item_id: int, estado: str = Form(...), back: str = Form("/")):
     if estado in ("abierto", "resuelto", "descartado"):
         items.set_state(item_id, estado, service.today().isoformat())
+        _refresh(item_id)
     return RedirectResponse(back if back.startswith("/") else "/", status_code=303)
 
 
@@ -127,6 +135,7 @@ def item_edit(
 ):
     clean = lambda v: " ".join(v.split())  # noqa: E731
     items.edit(item_id, responsable, clean(persona), clean(cliente), nota.strip())
+    _refresh(item_id)
     return RedirectResponse(back if back.startswith("/") else "/", status_code=303)
 
 

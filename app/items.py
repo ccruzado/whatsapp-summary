@@ -42,6 +42,23 @@ def for_chat_day(jid: str, day: str) -> list[dict]:
     )
 
 
+def get(item_id: int) -> dict | None:
+    rows = _rows("SELECT * FROM items WHERE id=?", (item_id,))
+    return rows[0] if rows else None
+
+
+def closed_by_user(jid: str) -> list[dict]:
+    """Pendientes que el usuario cerró o descartó a mano: el modelo no debe volver a crearlos."""
+    return _rows(
+        "SELECT * FROM items WHERE chat_jid=? AND cerrado_por='manual' AND estado IN ('resuelto','descartado') ORDER BY id",
+        (jid,),
+    )
+
+
+def discarded_on(jid: str, day: str) -> list[dict]:
+    return _rows("SELECT * FROM items WHERE chat_jid=? AND estado='descartado' AND resuelto_dia=? ORDER BY id", (jid, day))
+
+
 def add(
     jid: str, accion: str, responsable: str, persona: str, plazo: str, contexto: str, day: str, hora: str, cliente: str = ""
 ) -> int:

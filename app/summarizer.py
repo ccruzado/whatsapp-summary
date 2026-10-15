@@ -91,6 +91,12 @@ def extract(label: str, group: bool, company: str, day: str, lines: list[str], o
         + (f" | nota del usuario: {o['nota']}" if o.get("nota") else "")
         for o in [o for o in open_items if o.get("estado", "abierto") == "abierto"][:25]
     ) or "(ninguno)"
+    closed_txt = "\n".join(
+        f"- {o['accion']} ({'hecho por el usuario' if o['estado'] == 'resuelto' else 'descartado: no aplica'})"
+        + (f" | nota del usuario: {o['nota']}" if o.get("nota") else "")
+        for o in open_items
+        if o.get("cerrado_por") == "manual"
+    ) or "(ninguno)"
     prompt = _fill(
         prompts.EXTRACT,
         kind="grupo" if group else "conversación con",
@@ -98,6 +104,7 @@ def extract(label: str, group: bool, company: str, day: str, lines: list[str], o
         company=f" (empresa: {company})" if company else "",
         day=day,
         open=open_txt,
+        closed=closed_txt,
         conversation="\n".join(lines),  # al final: así un mensaje con «@@» no altera el prompt
     )
     for _ in range(2):

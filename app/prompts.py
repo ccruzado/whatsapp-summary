@@ -22,6 +22,9 @@ Cada línea es «HH:MM Quien: texto». «Yo» es el dueño de la cuenta. Un text
 PENDIENTES YA ABIERTOS EN ESTE CHAT (de días anteriores o de este mismo día):
 @@open@@
 
+YA CERRADOS O DESCARTADOS POR EL USUARIO (no los vuelvas a registrar ni a abrir; sirven de contexto):
+@@closed@@
+
 Tu tarea: devolver un JSON con el tema, las acciones y los datos clave.
 
 1) ¿ES LABORAL? Cada acción lleva «laboral»: true solo si es de trabajo (clientes, proyectos, ventas, soporte, reuniones,

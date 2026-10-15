@@ -15,6 +15,7 @@
 
 {% include "_board.html" %}
 
+<div id="chat-details">
 <h2 style="margin-top:28px">Detalle por chat — contenido laboral ({{ chats|length }})</h2>
 {% for c in chats %}
 <div class="card incl" data-name="{{ c.label }}" data-state="in">
@@ -41,6 +42,7 @@
   <details>
     <summary>Ver mensajes</summary>
     {% for m in c.messages %}<div class="msg"><span class="muted">{{ m.time }}</span> <b>{{ m.who }}</b>: {{ m.text }}</div>{% endfor %}
+</div>
   </details>
 </div>
 {% else %}
