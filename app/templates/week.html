@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Semana {{ monday }}{% endblock %}
+{% block body %}
+<div class="row">
+  <a href="/week/{{ prev }}">← anterior</a>
+  <h1>Semana del {{ monday }}</h1>
+  <a href="/week/{{ next }}">siguiente →</a>
+</div>
+
+<div class="card">
+  <div class="row">
+    <strong>Resumen semanal</strong>
+    <form method="post" action="/week/{{ monday }}/generate">
+      <button class="primary" {% if status.running %}disabled{% endif %}>Generar resumen semanal</button>
+    </form>
+  </div>
+  {% if digest %}<p class="summary">{{ digest }}</p>
+  {% else %}<p class="muted">Aún no hay resumen. Se genera los lunes a las 06:00 con la semana anterior, o usa el botón (necesita los resúmenes diarios).</p>{% endif %}
+</div>
+
+<h2>Días</h2>
+<ul class="plain">
+  {% for x in days %}<li><a href="/day/{{ x }}">{{ x }}</a></li>{% endfor %}
+</ul>
+{% endblock %}

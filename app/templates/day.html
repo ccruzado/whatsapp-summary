@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Resumen {{ d }}{% endblock %}
+{% block body %}
+<div class="row">
+  <a href="/day/{{ prev }}">← {{ prev }}</a>
+  <h1>{{ d }}</h1>
+  <a href="/day/{{ next }}">{{ next }} →</a>
+</div>
+
+<div class="card">
+  <div class="row">
+    <strong>Resumen del día</strong>
+    <form method="post" action="/day/{{ d }}/generate" class="row">
+      <label class="muted"><input type="checkbox" name="force" value="1"> regenerar todo</label>
+      <button class="primary" {% if status.running %}disabled{% endif %}>Generar resumen</button>
+    </form>
+  </div>
+  {% if digest %}<p class="summary">{{ digest }}</p>
+  {% else %}<p class="muted">Aún no hay resumen. Se genera solo a las 06:00 con el día anterior, o usa el botón.</p>{% endif %}
+</div>
+
+<h2>Interacciones ({{ chats|length }} chats)</h2>
+{% for c in chats %}
+<div class="card">
+  <div class="row">
+    <strong>{{ '👥 ' if c.group else '👤 ' }}{{ c.label }}</strong>
+    <span class="muted">{{ c.messages|length }} mensajes</span>
+  </div>
+  {% if c.summary %}<p class="summary">{{ c.summary }}</p>{% endif %}
+  <details>
+    <summary>Ver mensajes</summary>
+    {% for m in c.messages %}<div class="msg"><span class="muted">{{ m.time }}</span> <b>{{ m.who }}</b>: {{ m.text }}</div>{% endfor %}
+  </details>
+  <form method="post" action="/chats/toggle" style="margin-top:8px">
+    <input type="hidden" name="jid" value="{{ c.jid }}">
+    <input type="hidden" name="excluded" value="1">
+    <button class="muted">Excluir este chat</button>
+  </form>
+</div>
+{% else %}
+<p class="muted">No hay mensajes este día (o aún no vinculas WhatsApp).</p>
+{% endfor %}
+{% if excluded_count %}<p class="muted">{{ excluded_count }} chat(s) con actividad están excluidos. <a href="/chats">Gestionar</a></p>{% endif %}
+{% endblock %}

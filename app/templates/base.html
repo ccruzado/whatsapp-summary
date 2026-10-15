@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{% if status.running %}<meta http-equiv="refresh" content="5">{% endif %}
+<title>{% block title %}Resumen de WhatsApp{% endblock %}</title>
+<style>
+  :root { --bg:#fafaf9; --fg:#1c1917; --muted:#78716c; --card:#fff; --line:#e7e5e4; --accent:#15803d; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#1c1917; --fg:#f5f5f4; --muted:#a8a29e; --card:#292524; --line:#44403c; --accent:#4ade80; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 16px; }
+  nav { display:flex; gap:16px; align-items:center; flex-wrap:wrap; padding:12px 16px; border-bottom:1px solid var(--line); }
+  nav a { color:var(--fg); text-decoration:none; font-weight:600; }
+  nav a:hover { color:var(--accent); }
+  h1 { font-size:1.4rem; margin:8px 0; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin:12px 0; }
+  .summary { white-space:pre-wrap; }
+  .muted { color:var(--muted); font-size:.9rem; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:space-between; }
+  button { font:inherit; padding:6px 12px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  details summary { cursor:pointer; color:var(--muted); }
+  .msg { font-size:.9rem; margin:2px 0; }
+  .msg b { font-weight:600; }
+  .status { border-left:4px solid var(--accent); }
+  ul.plain { list-style:none; padding:0; }
+  ul.plain li { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); gap:8px; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/">Hoy</a>
+  <a href="/week">Semana</a>
+  <a href="/chats">Chats excluidos</a>
+</nav>
+<main>
+  {% if status.message %}<div class="card status muted">{% if status.running %}⏳ {% endif %}{{ status.message }}</div>{% endif %}
+  {% block body %}{% endblock %}
+</main>
+</body>
+</html>

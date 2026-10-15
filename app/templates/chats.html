@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Chats{% endblock %}
+{% block body %}
+<h1>Chats y grupos</h1>
+<p class="muted">Los chats excluidos no aparecen ni se resumen. Los mensajes siguen guardándose en el puente.</p>
+<ul class="plain">
+  {% for c in chats %}
+  <li>
+    <span>{{ '👥 ' if c.group else '👤 ' }}{{ c.label }}{% if c.excluded %} <span class="muted">(excluido)</span>{% endif %}</span>
+    <form method="post" action="/chats/toggle">
+      <input type="hidden" name="jid" value="{{ c.jid }}">
+      {% if not c.excluded %}<input type="hidden" name="excluded" value="1">{% endif %}
+      <button>{{ 'Incluir' if c.excluded else 'Excluir' }}</button>
+    </form>
+  </li>
+  {% else %}
+  <li class="muted">Aún no hay chats. Vincula WhatsApp escaneando el QR (ver README).</li>
+  {% endfor %}
+</ul>
+{% endblock %}

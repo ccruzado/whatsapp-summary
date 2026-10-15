@@ -1,0 +1,32 @@
+services:
+  bridge:
+    build: ./bridge
+    restart: unless-stopped
+    # tty + stdin: el QR de vinculación se ve con `docker compose logs -f bridge`.
+    tty: true
+    stdin_open: true
+    volumes:
+      - bridge_store:/app/store
+    # Sin `ports`: la API REST del puente (con endpoints de envío) no se expone fuera de la red de compose.
+
+  app:
+    build: ./app
+    restart: unless-stopped
+    depends_on:
+      - bridge
+    ports:
+      - "127.0.0.1:8765:8000"
+    environment:
+      OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: qwen2.5:7b
+      TZ_NAME: America/Lima
+      SUMMARY_HOUR: "6"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - bridge_store:/bridge:ro
+      - app_data:/data
+
+volumes:
+  bridge_store:
+  app_data:
