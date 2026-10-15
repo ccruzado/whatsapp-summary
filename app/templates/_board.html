@@ -1,48 +1,72 @@
-{# Tablero de pendientes: separa con claridad lo mío de lo que esperan/deben otros. Variables: board, back, avatar. #}
-{% macro rows(list, kind) %}
-{% for r in list %}
-<div class="task {{ kind }}">
-  <img class="av sm" loading="lazy" src="{{ avatar(r.chat_jid, r.label) }}" alt="">
-  <div class="task-body">
-    <div><b>{{ r.label }}</b>{% if r.company %} <span class="muted">· {{ r.company }}</span>{% endif %}</div>
-    <div>{% if r.responsable != 'yo' and r.persona %}<b>{{ r.persona }}:</b> {% endif %}{{ r.accion }}</div>
-    <div class="muted">
-      {% if r.plazo %}⏰ {{ r.plazo }} · {% endif %}
-      {% if kind.startswith('done') %}✓ {{ r.resuelto_dia }}{% if r.evidencia %} {{ r.evidencia }}{% endif %}
-      {% else %}{% if r.age > 0 %}<span class="{{ 'late' if r.age >= 3 }}">desde {{ r.creado_dia }} ({{ r.age }} d)</span>{% else %}nuevo{% endif %}{% endif %}
-      {% if r.contexto %} · {{ r.contexto }}{% endif %}
-    </div>
+{# Tablero de pendientes agrupado por chat: lo mío vs lo que esperan/deben otros. Variables: board, back, avatar. #}
+{% macro groups(list, kind) %}
+{% for g in list %}
+<div class="chat-group">
+  <div class="chat-head">
+    <img class="av sm" loading="lazy" src="{{ avatar(g.jid, g.label) }}" alt="">
+    <b>{{ g.label }}</b>{% if g.company %}<span class="muted">· {{ g.company }}</span>{% endif %}
   </div>
-  <form method="post" action="/items/{{ r.id }}/estado" class="task-actions">
-    <input type="hidden" name="back" value="{{ back }}">
-    {% if kind.startswith('done') %}
-      <button name="estado" value="abierto" title="Volver a abrir">↩ Reabrir</button>
-    {% else %}
-      <button class="ok" name="estado" value="resuelto" title="Marcar como hecho">✓ Hecho</button>
-      <button name="estado" value="descartado" title="No era un pendiente real / ya no aplica">✕</button>
-    {% endif %}
-  </form>
+  {% for r in g.rows %}
+  <div class="task {{ kind }}">
+    <div class="task-body">
+      <div>{% if r.responsable != 'yo' %}<b>{{ r.persona or 'Por asignar' }}:</b> {% endif %}{{ r.accion }}</div>
+      <div class="muted">
+        {% if r.cliente %}<span class="tag">🏷 {{ r.cliente }}</span>{% else %}<span class="tag warn" title="Añade el cliente/proyecto con «Editar»">🏷 sin cliente/proyecto</span>{% endif %}
+        {% if r.plazo %}⏰ {{ r.plazo }} · {% endif %}
+        {% if kind.startswith('done') %}✓ {{ r.resuelto_dia }}{% if r.evidencia %} {{ r.evidencia }}{% endif %}
+        {% else %}{% if r.age > 0 %}<span class="{{ 'late' if r.age >= 3 }}">desde {{ r.creado_dia }} ({{ r.age }} d)</span>{% else %}nuevo{% endif %}{% endif %}
+      </div>
+      {% if r.contexto %}<div class="muted">{{ r.contexto }}</div>{% endif %}
+      {% if r.nota %}<div class="note">📝 {{ r.nota }}</div>{% endif %}
+      <details class="edit">
+        <summary>Editar contexto</summary>
+        <form method="post" action="/items/{{ r.id }}/editar" class="edit-form">
+          <input type="hidden" name="back" value="{{ back }}">
+          <label>Responsable
+            <select name="responsable">
+              <option value="yo" {{ 'selected' if r.responsable == 'yo' }}>Yo</option>
+              <option value="otro" {{ 'selected' if r.responsable != 'yo' }}>Otra persona</option>
+            </select>
+          </label>
+          <label>Persona <input type="text" name="persona" value="{{ r.persona }}" placeholder="si es de otro"></label>
+          <label>Cliente / proyecto <input type="text" name="cliente" value="{{ r.cliente }}" placeholder="p. ej. Pesquera Diamante"></label>
+          <label class="wide">Contexto adicional <textarea name="nota" rows="2" placeholder="Lo que falta para entender y dar seguimiento">{{ r.nota }}</textarea></label>
+          <button class="primary">Guardar</button>
+        </form>
+      </details>
+    </div>
+    <form method="post" action="/items/{{ r.id }}/estado" class="task-actions">
+      <input type="hidden" name="back" value="{{ back }}">
+      {% if kind.startswith('done') %}
+        <button name="estado" value="abierto" title="Volver a abrir">↩ Reabrir</button>
+      {% else %}
+        <button class="ok" name="estado" value="resuelto" title="Marcar como hecho">✓ Hecho</button>
+        <button name="estado" value="descartado" title="No era un pendiente real / ya no aplica">✕</button>
+      {% endif %}
+    </form>
+  </div>
+  {% endfor %}
 </div>
 {% endfor %}
 {% endmacro %}
 
 <div class="board">
   <section class="col mine">
-    <h2>🙋 Mis pendientes <span class="count">{{ board.mine|length }}</span></h2>
-    {{ rows(board.mine, 'mine') }}
+    <h2>🙋 Mis pendientes <span class="count">{{ board.n_mine }}</span></h2>
+    {{ groups(board.mine, 'mine') }}
     {% if not board.mine %}<p class="muted">Nada pendiente de tu lado.</p>{% endif %}
   </section>
   <section class="col others">
-    <h2>⏳ Pendientes de otros <span class="count">{{ board.others|length }}</span></h2>
-    {{ rows(board.others, 'others') }}
+    <h2>⏳ Pendientes de otros <span class="count">{{ board.n_others }}</span></h2>
+    {{ groups(board.others, 'others') }}
     {% if not board.others %}<p class="muted">No estás esperando nada de nadie.</p>{% endif %}
   </section>
 </div>
 
-{% if board.done_mine or board.done_others %}
+{% if board.n_done_mine or board.n_done_others %}
 <details class="card" {% if open_done %}open{% endif %}>
-  <summary><b>✅ Resueltos ({{ board.done_mine|length + board.done_others|length }})</b></summary>
-  {% if board.done_mine %}<h3 class="muted">Míos</h3>{{ rows(board.done_mine, 'done mine') }}{% endif %}
-  {% if board.done_others %}<h3 class="muted">De otros</h3>{{ rows(board.done_others, 'done others') }}{% endif %}
+  <summary><b>✅ Resueltos ({{ board.n_done_mine + board.n_done_others }})</b></summary>
+  {% if board.done_mine %}<h3 class="muted">Míos</h3>{{ groups(board.done_mine, 'done mine') }}{% endif %}
+  {% if board.done_others %}<h3 class="muted">De otros</h3>{{ groups(board.done_others, 'done others') }}{% endif %}
 </details>
 {% endif %}

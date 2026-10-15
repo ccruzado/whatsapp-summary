@@ -37,7 +37,9 @@ Tu tarea: devolver un JSON con el tema, las acciones y los datos clave.
    - Si YO pregunto, pido o consulto algo («quería saber si hay novedades», «¿me puedes enviar…?», «¿ya confirmaste…?»),
      quien debe responder o hacerlo es LA OTRA PERSONA → quien_debe = su nombre, pedido_por = «Yo». Redacta la acción desde
      su punto de vista («Informar novedades de la PoC»), no como una tarea mía.
-   - En grupos incluye solo acciones mías, y las de otros que me deben a mí o que bloquean mi trabajo.
+   - EN GRUPOS: una instrucción a todo el grupo o a otras personas NO es mía. Es «Yo» solo si me nombran («Carlos…», @mención),
+     me responden a mí, o yo mismo me comprometo. Si no, quien_debe es la persona o equipo nombrado (p. ej. «Equipo Edata»);
+     y si no se sabe, «Por asignar». Incluye de otros solo lo que me deben a mí o bloquea mi trabajo.
 
 4) ESTADO — sé estricto, la utilidad depende de esto:
    - «resuelto» SOLO si hay un mensaje POSTERIOR al pedido que lo cumple: una confirmación («listo», «ya lo envié», «recibido»)
@@ -50,7 +52,16 @@ Tu tarea: devolver un JSON con el tema, las acciones y los datos clave.
    - Varios mensajes sobre lo mismo son UNA acción. Una acción nueva lleva id null.
    - Las acciones pedidas y cumplidas dentro de esta misma conversación también se incluyen (estado «resuelto»).
 
-CAMPOS: «accion» (verbo + qué, una línea), «plazo» (como se dijo: «hoy», «viernes 3pm»; vacío si no hay), «contexto» (una
+6) CLIENTE/PROYECTO Y CONTEXTO — cada acción debe entenderse sola, sin abrir el chat:
+   - «cliente_proyecto»: para qué cliente, proyecto u oportunidad es (p. ej. «Pesquera Diamante – FortiMail»). Búscalo en la
+     conversación, en el nombre del chat y en los pendientes abiertos. Si de verdad no se puede saber, escribe «No identificado».
+   - «accion» es autosuficiente: verbo + qué + sobre qué, p. ej. «Obtener el SFID al 40% para iniciar el ITF», no «Obtener el SFID».
+     NO repitas el cliente o proyecto dentro de «accion»: va aparte, en «cliente_proyecto».
+   - «contexto» (OBLIGATORIO, nunca vacío): una frase con el motivo o detalle que ayude al seguimiento: qué se necesita, para qué
+     y qué lo bloquea. Si la conversación no da más contexto, escribe «Sin más contexto en el chat».
+   - Si dos mensajes piden lo mismo con otras palabras, es UNA sola acción.
+
+CAMPOS: «accion» (verbo + qué + sobre qué, una línea), «plazo» (como se dijo: «hoy», «viernes 3pm»; vacío si no hay), «contexto» (una
 frase: cliente, proyecto o motivo, para entender la acción sin leer el chat), «hora_origen» (HH:MM del mensaje donde se pidió o
 prometió; debe existir en la conversación; vacío para ids ya abiertos), «datos_clave» (montos, fechas, versiones, equipos,
 nombres de archivos; solo lo relevante).
@@ -63,20 +74,31 @@ EJEMPLO 1 (solo muestra formato y criterio; no es parte de la conversación):
 16:41 Ana: gracias, recibida
 Resultado:
 {"tema":"Cotización FortiGate y visita","items":[
-{"laboral":true,"id":null,"pedido_por":"Ana","quien_debe":"Yo","accion":"Enviar la cotización de FortiGate a Ana","plazo":"hoy","contexto":"Oferta FortiGate para Ana","hora_origen":"09:10","evidencia":"16:40","estado":"resuelto"},
-{"laboral":true,"id":null,"pedido_por":"Yo","quien_debe":"Ana","accion":"Confirmar la fecha de la visita","plazo":"","contexto":"Visita al cliente de Ana","hora_origen":"09:15","evidencia":"","estado":"abierto"}],
+{"laboral":true,"id":null,"pedido_por":"Ana","quien_debe":"Yo","cliente_proyecto":"Cliente de Ana – FortiGate","accion":"Enviar la cotización de FortiGate a Ana","plazo":"hoy","contexto":"Oferta FortiGate para Ana","hora_origen":"09:10","evidencia":"16:40","estado":"resuelto"},
+{"laboral":true,"id":null,"pedido_por":"Yo","quien_debe":"Ana","cliente_proyecto":"Cliente de Ana – FortiGate","accion":"Confirmar la fecha de la visita","plazo":"","contexto":"Visita al cliente de Ana","hora_origen":"09:15","evidencia":"","estado":"abierto"}],
 "datos_clave":["cotizacion_fg.pdf"]}
 
 EJEMPLO 2:
 11:00 Yo: Hola Luis, quería saber si hay novedades de la prueba y si te puedo ayudar en algo más
 Resultado:
 {"tema":"Seguimiento de la prueba","items":[
-{"laboral":true,"id":null,"pedido_por":"Yo","quien_debe":"Luis","accion":"Informar novedades de la prueba","plazo":"","contexto":"Seguimiento de la prueba","hora_origen":"11:00","evidencia":"","estado":"abierto"}],
+{"laboral":true,"id":null,"pedido_por":"Yo","quien_debe":"Luis","cliente_proyecto":"No identificado","accion":"Informar novedades de la prueba","plazo":"","contexto":"Seguimiento de la prueba","hora_origen":"11:00","evidencia":"","estado":"abierto"}],
 "datos_clave":[]}
 (El ofrecimiento «si te puedo ayudar en algo más» no es una acción.)
 
 <chat>
 @@conversation@@
+</chat>"""
+
+# Fusión de duplicados: pendientes abiertos de un chat que son la misma tarea redactada distinto.
+CONSOLIDATE = """Estos son los pendientes abiertos del chat «@@label@@».
+Detecta los que son LA MISMA tarea redactada de otra forma (p. ej. «Pedir el 40% para iniciar el ITF» y «Obtener el SFID
+para el ITF», si ambos buscan lo mismo). Devuelve en «grupos» cada conjunto de 2 o más ids que deben fusionarse, con una
+sola redacción autosuficiente en «accion» (verbo + qué + sobre qué) que conserve el plazo y el cliente/proyecto.
+Agrupa solo si es realmente la misma acción y la hace la misma persona. Si no hay duplicados, «grupos» va vacío.
+
+<chat>
+@@list@@
 </chat>"""
 
 # Semana: solo la narrativa (los pendientes y su estado salen de la base de pendientes).

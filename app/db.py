@@ -69,6 +69,11 @@ def init() -> None:
         cols = {r["name"] for r in c.execute("PRAGMA table_info(summaries)")}
         if "msg_count" not in cols:
             c.execute("ALTER TABLE summaries ADD COLUMN msg_count INTEGER NOT NULL DEFAULT 0")
+        icols = {r["name"] for r in c.execute("PRAGMA table_info(items)")}
+        for col, ddl in (("cliente", "TEXT NOT NULL DEFAULT ''"), ("nota", "TEXT NOT NULL DEFAULT ''"), ("fijo", "INTEGER NOT NULL DEFAULT 0")):
+            # cliente/proyecto de la tarea; nota = contexto añadido a mano; fijo = el usuario la tocó (no se borra al regenerar)
+            if col not in icols:
+                c.execute(f"ALTER TABLE items ADD COLUMN {col} {ddl}")
 
 
 def excluded() -> set[str]:

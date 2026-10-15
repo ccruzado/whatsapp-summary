@@ -116,6 +116,20 @@ def item_state(item_id: int, estado: str = Form(...), back: str = Form("/")):
     return RedirectResponse(back if back.startswith("/") else "/", status_code=303)
 
 
+@app.post("/items/{item_id}/editar")
+def item_edit(
+    item_id: int,
+    responsable: str = Form("yo"),
+    persona: str = Form(""),
+    cliente: str = Form(""),
+    nota: str = Form(""),
+    back: str = Form("/"),
+):
+    clean = lambda v: " ".join(v.split())  # noqa: E731
+    items.edit(item_id, responsable, clean(persona), clean(cliente), nota.strip())
+    return RedirectResponse(back if back.startswith("/") else "/", status_code=303)
+
+
 @app.get("/week")
 def week_current():
     return RedirectResponse(f"/week/{service.today().isoformat()}")

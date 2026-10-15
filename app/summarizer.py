@@ -26,6 +26,7 @@ SCHEMA = {
                     "id": {"type": ["integer", "null"]},
                     "pedido_por": {"type": "string"},
                     "quien_debe": {"type": "string"},
+                    "cliente_proyecto": {"type": "string"},
                     "accion": {"type": "string"},
                     "plazo": {"type": "string"},
                     "contexto": {"type": "string"},
@@ -33,7 +34,7 @@ SCHEMA = {
                     "evidencia": {"type": "string"},
                     "estado": {"type": "string", "enum": ["abierto", "resuelto"]},
                 },
-                "required": ["laboral", "accion", "quien_debe", "estado"],
+                "required": ["laboral", "accion", "quien_debe", "cliente_proyecto", "contexto", "estado"],
             },
         },
         "datos_clave": {"type": "array", "items": {"type": "string"}},
@@ -86,6 +87,8 @@ def extract(label: str, group: bool, company: str, day: str, lines: list[str], o
     open_txt = "\n".join(
         f"id={o['id']} | {'yo' if o['responsable'] == 'yo' else 'otro: ' + (o['persona'] or '?')} | {o['accion']}"
         f" | abierto desde {o['creado_dia']}"
+        + (f" | cliente/proyecto: {o['cliente']}" if o.get("cliente") else "")
+        + (f" | nota del usuario: {o['nota']}" if o.get("nota") else "")
         for o in [o for o in open_items if o.get("estado", "abierto") == "abierto"][:25]
     ) or "(ninguno)"
     prompt = _fill(
@@ -105,6 +108,37 @@ def extract(label: str, group: bool, company: str, day: str, lines: list[str], o
         except (ValueError, httpx.HTTPError):
             continue
     return {"tema": "", "items": [], "datos_clave": []}
+
+
+CONSOLIDATE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "grupos": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"ids": {"type": "array", "items": {"type": "integer"}}, "accion": {"type": "string"}},
+                "required": ["ids", "accion"],
+            },
+        }
+    },
+    "required": ["grupos"],
+}
+
+
+def consolidate(label: str, open_items: list[dict]) -> list[dict]:
+    """Grupos de pendientes abiertos que son la misma tarea: [{ids, accion}]."""
+    lst = "\n".join(
+        f"id={o['id']} | {'yo' if o['responsable'] == 'yo' else 'otro: ' + (o['persona'] or '?')} | {o['accion']}"
+        + (f" | plazo: {o['plazo']}" if o["plazo"] else "")
+        + (f" | cliente/proyecto: {o['cliente']}" if o["cliente"] else "")
+        for o in open_items[:40]
+    )
+    try:
+        data = json.loads(_ask(_fill(prompts.CONSOLIDATE, label=label, list=lst), CONSOLIDATE_SCHEMA))
+        return [g for g in data.get("grupos", []) if isinstance(g, dict)]
+    except (ValueError, httpx.HTTPError):
+        return []
 
 
 def topic_of(summary: str) -> str:

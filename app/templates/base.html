@@ -55,6 +55,16 @@
   .col { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:4px 14px 12px; }
   .col.mine { border-top:4px solid #2563eb; } .col.others { border-top:4px solid #d97706; }
   .col h2 { margin:10px 0; } .count { font-size:.8rem; background:var(--line); border-radius:99px; padding:1px 9px; vertical-align:middle; }
+  .chat-group { border-bottom:1px solid var(--line); padding:6px 0 4px; } .chat-group:last-child { border-bottom:0; }
+  .chat-head { display:flex; gap:8px; align-items:center; padding:4px 0; }
+  .chat-group .task { padding:6px 0 6px 40px; border-bottom:0; border-left:2px solid var(--line); margin-left:15px; padding-left:14px; }
+  .tag { background:var(--accent-bg); color:var(--accent); border-radius:6px; padding:0 6px; font-size:.8rem; margin-right:4px; }
+  .tag.warn { background:var(--bad-bg); color:var(--bad); }
+  .note { background:rgba(234,179,8,.15); border-radius:6px; padding:2px 8px; font-size:.9rem; margin-top:2px; }
+  details.edit summary { font-size:.8rem; }
+  .edit-form { display:grid; grid-template-columns:1fr 1fr; gap:6px 10px; margin:6px 0; }
+  .edit-form label { display:flex; flex-direction:column; font-size:.8rem; color:var(--muted); gap:2px; }
+  .edit-form .wide { grid-column:1 / -1; } .edit-form textarea { font:inherit; padding:6px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); }
   .task { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--line); }
   .task:last-child { border-bottom:0; }
   .task-body { flex:1; min-width:0; } .task-actions { display:flex; gap:6px; flex:none; }

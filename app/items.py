@@ -42,14 +42,44 @@ def for_chat_day(jid: str, day: str) -> list[dict]:
     )
 
 
-def add(jid: str, accion: str, responsable: str, persona: str, plazo: str, contexto: str, day: str, hora: str) -> int:
+def add(
+    jid: str, accion: str, responsable: str, persona: str, plazo: str, contexto: str, day: str, hora: str, cliente: str = ""
+) -> int:
     with db.app_conn() as c:
         cur = c.execute(
-            "INSERT INTO items (chat_jid, accion, responsable, persona, plazo, contexto, creado_dia, hora_origen)"
-            " VALUES (?,?,?,?,?,?,?,?)",
-            (jid, accion, responsable, persona, plazo, contexto, day, hora),
+            "INSERT INTO items (chat_jid, accion, responsable, persona, plazo, contexto, creado_dia, hora_origen, cliente)"
+            " VALUES (?,?,?,?,?,?,?,?,?)",
+            (jid, accion, responsable, persona, plazo, contexto, day, hora, cliente),
         )
         return cur.lastrowid
+
+
+def edit(item_id: int, responsable: str, persona: str, cliente: str, nota: str) -> None:
+    """Edición manual: queda «fijo» (no se borra al regenerar el día) y su nota se le muestra al modelo."""
+    with db.app_conn() as c:
+        c.execute(
+            "UPDATE items SET responsable=?, persona=?, cliente=?, nota=?, fijo=1 WHERE id=?",
+            ("yo" if responsable == "yo" else "otro", persona if responsable != "yo" else "", cliente, nota, item_id),
+        )
+
+
+def merge(keep_id: int, drop_ids: list[int], accion: str) -> None:
+    """Fusiona duplicados en `keep_id`: conserva el más antiguo, reúne cliente/contexto/nota y borra los demás."""
+    with db.app_conn() as c:
+        rows = {r["id"]: dict(r) for r in c.execute(f"SELECT * FROM items WHERE id IN ({','.join('?' * (len(drop_ids) + 1))})", [keep_id, *drop_ids])}
+        keep = rows.get(keep_id)
+        if not keep:
+            return
+        for field in ("cliente", "contexto", "plazo", "persona"):
+            if not keep[field]:
+                keep[field] = next((rows[i][field] for i in drop_ids if i in rows and rows[i][field]), "")
+        nota = " · ".join(dict.fromkeys(n for n in [keep["nota"], *[rows[i]["nota"] for i in drop_ids if i in rows]] if n))
+        fijo = int(any(r["fijo"] for r in rows.values()))
+        c.execute(
+            "UPDATE items SET accion=?, cliente=?, contexto=?, plazo=?, persona=?, nota=?, fijo=? WHERE id=?",
+            (accion or keep["accion"], keep["cliente"], keep["contexto"], keep["plazo"], keep["persona"], nota, fijo, keep_id),
+        )
+        c.executemany("DELETE FROM items WHERE id=?", [(i,) for i in drop_ids if i in rows])
 
 
 def resolve(item_id: int, day: str, evidencia: str, by: str = "llm") -> None:
@@ -74,7 +104,7 @@ def set_state(item_id: int, estado: str, day: str) -> None:
 def reset_chat_day(jid: str, day: str) -> None:
     """Deshace lo que el modelo registró ese día para ese chat (para poder regenerar sin duplicar)."""
     with db.app_conn() as c:
-        c.execute("DELETE FROM items WHERE chat_jid=? AND creado_dia=? AND cerrado_por != 'manual'", (jid, day))
+        c.execute("DELETE FROM items WHERE chat_jid=? AND creado_dia=? AND cerrado_por != 'manual' AND fijo=0", (jid, day))
         c.execute(
             "UPDATE items SET estado='abierto', resuelto_dia=NULL, evidencia='', cerrado_por=''"
             " WHERE chat_jid=? AND resuelto_dia=? AND cerrado_por='llm'",
@@ -114,12 +144,26 @@ def board(as_of: date, res_from: date, res_to: date, labels: dict[str, dict], sk
 
     opened = sorted(_enrich(open_rows, labels, as_of), key=order)
     done = sorted(_enrich(done_rows, labels, as_of), key=lambda r: (db.norm(r["label"]), r["id"]))
-    return {
+    parts = {
         "mine": [r for r in opened if r["responsable"] == "yo"],
         "others": [r for r in opened if r["responsable"] != "yo"],
         "done_mine": [r for r in done if r["responsable"] == "yo"],
         "done_others": [r for r in done if r["responsable"] != "yo"],
     }
+    out: dict = {}
+    for key, rows in parts.items():
+        out[key] = _by_chat(rows, labels)
+        out["n_" + key] = len(rows)
+    return out
+
+
+def _by_chat(rows: list[dict], labels: dict[str, dict]) -> list[dict]:
+    """Agrupa por chat (el nombre se muestra una sola vez), en orden alfabético; dentro, el orden ya viene dado."""
+    groups: dict[str, dict] = {}
+    for r in rows:
+        g = groups.setdefault(r["chat_jid"], {"jid": r["chat_jid"], "label": r["label"], "company": r["company"], "rows": []})
+        g["rows"].append(r)
+    return sorted(groups.values(), key=lambda g: db.sort_key(g["label"]))
 
 
 def created_between(a: date, b: date) -> int:

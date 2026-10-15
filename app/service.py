@@ -81,13 +81,18 @@ def _apply(res: dict, jid: str, day: str, chat: dict, times: set[str], known: li
         if not debe:
             continue
         yo = db.norm(debe) in ("yo", "yo mismo") or db.norm(debe).startswith(db.norm(summarizer.OWNER.split()[0]))
+        if yo and not _mine_ok(chat, origin):  # en grupos solo es mío si me nombran o yo lo dije
+            yo, debe = False, "Por asignar"
         who = "yo" if yo else "otro"
         persona = "" if yo else debe
         if who == "otro" and not persona and not chat["group"]:
             persona = chat["label"]
+        cliente = " ".join(str(it.get("cliente_proyecto") or "").split())
+        if db.norm(cliente).startswith("no identificado"):
+            cliente = chat["label"] if chat["group"] else ""
         new_id = items.add(
             jid, accion, who, persona, " ".join(str(it.get("plazo") or "").split()),
-            " ".join(str(it.get("contexto") or "").split()), day, origin,
+            " ".join(str(it.get("contexto") or "").split()), day, origin, cliente,
         )
         row = {"id": new_id, "accion": accion, "estado": "abierto", "responsable": who, "persona": persona, "creado_dia": day}
         if resolved:
@@ -96,6 +101,27 @@ def _apply(res: dict, jid: str, day: str, chat: dict, times: set[str], known: li
         known.append(row)
         changed = True
     return changed
+
+
+def _mine_ok(chat: dict, origin: str) -> bool:
+    """En grupos, un pendiente es mío solo si el mensaje de origen es mío o me nombra."""
+    if not chat["group"]:
+        return True
+    first = db.norm(summarizer.OWNER.split()[0])
+    return any(m["time"] == origin and (m["who"] == "Yo" or first in db.norm(m["text"])) for m in chat["messages"])
+
+
+def _consolidate(jid: str, label: str) -> None:
+    """Fusiona pendientes abiertos que son la misma tarea (misma persona), conservando el más antiguo."""
+    open_ = items.open_for_chat(jid)
+    if len(open_) < 2:
+        return
+    by_id = {o["id"]: o for o in open_}
+    for g in summarizer.consolidate(label, open_):
+        ids = sorted({i for i in g.get("ids", []) if i in by_id})
+        if len(ids) < 2 or len({by_id[i]["responsable"] for i in ids}) > 1:
+            continue
+        items.merge(ids[0], ids[1:], " ".join(str(g.get("accion") or "").split()))
 
 
 def _render_chat(jid: str, day: str, tema: str, datos: list[str], changed: bool) -> str:
@@ -145,6 +171,8 @@ def _summarize_day_chat(period: str, jid: str, chat: dict, force: bool) -> None:
         tema = tema or " ".join(str(res.get("tema") or "").split())
         datos += [d for d in (res.get("datos_clave") or []) if isinstance(d, str) and d.strip() and d not in datos]
         changed |= _apply(res, jid, period, chat, times, known)
+    if changed:
+        _consolidate(jid, chat["label"])
     db.save_summary("day", period, jid, _render_chat(jid, period, tema, datos, changed), n)
 
 
