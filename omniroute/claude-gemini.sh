@@ -4,7 +4,7 @@
 DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 [ -f "$DIR/.env.client" ] && set -a && . "$DIR/.env.client" && set +a
 : "${OMNIROUTE_API_KEY:?Define OMNIROUTE_API_KEY (ver omniroute/.env.client.example)}"
-MODEL="${OMNIROUTE_MODEL:-gemini/gemini-3.8-flash}"
+MODEL="${OMNIROUTE_MODEL:-gemini-fallback}"
 export ANTHROPIC_BASE_URL="${OMNIROUTE_URL:-http://localhost:20128}"
 export ANTHROPIC_AUTH_TOKEN="$OMNIROUTE_API_KEY"
 export ANTHROPIC_MODEL="$MODEL"
