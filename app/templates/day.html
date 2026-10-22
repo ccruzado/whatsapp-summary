@@ -42,12 +42,12 @@
   <details>
     <summary>Ver mensajes</summary>
     {% for m in c.messages %}<div class="msg"><span class="muted">{{ m.time }}</span> <b>{{ m.who }}</b>: {{ m.text }}</div>{% endfor %}
-</div>
   </details>
 </div>
 {% else %}
 <p class="muted">No hay chats con contenido laboral este día.</p>
 {% endfor %}
+</div>
 
 {% if nowork %}
 <details style="margin-top:16px">
